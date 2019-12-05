@@ -1,7 +1,7 @@
 # RESTFUL-API框架 for OKEX v3 接口文档
 
 ## Object: okex_api.Exchange()
-默认调用 CONSTANT.V3_API_KEY\V3_SECRET\V3_PASSPHRASE
+默认调用  CONSTANT.V3_API_KEY \ V3_SECRET \ V3_PASSPHRASE
 
 ###  Exchange.get_timestamp()
 ​    功能：获取服务端的时间戳
