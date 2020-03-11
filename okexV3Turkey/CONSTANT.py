@@ -1,9 +1,9 @@
 API_KEY = ''
 SECRET = ''
 
-V3_API_KEY = ''
-V3_SECRET = ''
-V3_PASSPHRASE = ''
+V3_API_KEY = 'Turkey Sui'
+V3_SECRET = 'Anarchist'
+V3_PASSPHRASE = 'Vive La Commune!'
 
 OHLCV_INDEX = {0:'Timestamp',
                1:'Open',
@@ -77,6 +77,7 @@ COINS_WITHDRAW_RECORD = '/api/account/v3/withdrawal/history'
 COIN_WITHDRAW_RECORD = '/api/account/v3/withdrawal/history/'
 LEDGER_RECORD = '/api/account/v3/ledger'
 TOP_UP_ADDRESS = '/api/account/v3/deposit/address'
+VALUATION_CURRENCY = '/api/account/v3/asset-valuation'
 COIN_TOP_UP_RECORDS = '/api/account/v3/deposit/history'
 COIN_TOP_UP_RECORD = '/api/account/v3/deposit/history/'
 
@@ -175,3 +176,14 @@ SWAP_FILLS = '/api/swap/v3/fills'
 SWAP_INSTRUMENTS = '/api/swap/v3/instruments'
 SWAP_TICKETS = '/api/swap/v3/instruments/ticker'
 SWAP_RATE = '/api/swap/v3/rate'
+
+# OPTION
+OPTION_POSITION_BTCUSD = '/api/option/v3/BTC-USD/position'
+OPTION_ACCOUNTS_BTCUSD = '/api/option/v3/accounts/BTC-USD'
+OPTION_ORDER = '/api/option/v3/order'
+OPTION_CANCEL_ORDER = '/api/option/v3/cancel_order/'
+OPTION_ORDERS = '/api/option/v3/orders'
+
+OPTION_INSTRUMENTS = '/api/option/v3/instruments/'
+OPTION_INSTRUMENT = '/api/option/v3/instruments/'
+
