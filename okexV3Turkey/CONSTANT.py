@@ -1,9 +1,9 @@
 API_KEY = ''
 SECRET = ''
 
-V3_API_KEY = 'Turkey Sui'
-V3_SECRET = 'Anarchist'
-V3_PASSPHRASE = 'Vive La Commune!'
+V3_API_KEY = ''
+V3_SECRET = ''
+V3_PASSPHRASE = ''
 
 OHLCV_INDEX = {0:'Timestamp',
                1:'Open',

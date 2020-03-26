@@ -4,31 +4,21 @@ Created on Mon Aug 19 02:26:24 2019
 
 @author: pc
 """
-import nest_asyncio
-nest_asyncio.apply()
-
-import threading
-import asyncio
-import aiohttp
-
-#import ccxt
 import time
 import numpy as np
 import pandas as pd
-import CONSTANT as c
-import CONSTANT
-from matplotlib import pyplot as plt
 import datetime
 import requests
 import hashlib
 import json
-#from . import CONSTANT as c
-from CONSTANT import *
-import utils
+from . import CONSTANT
+from . import CONSTANT as c
+from . CONSTANT import *
+from . import utils
 
 class Exchange:
     
-    def __init__(self,api_key=None,secret=None,use_server_time=False):
+    def __init__(self,api_key=None,secret=None,use_server_time=False,load_markets=True):
 #        
 #        self.exchange = ccxt.okex()
 #        self.exchange_swap = ccxt.okex3()
@@ -37,24 +27,13 @@ class Exchange:
         self.PASSPHRASE = CONSTANT.V3_PASSPHRASE
         
         self.okex_url = 'https://www.okex.me'
-#        
-#        self.exchange.API_SECRET_KEY = CONSTANT.API_KEY
-#        self.exchange.secret = CONSTANT.SECRET
-#        self.exchange_swap.API_SECRET_KEY = CONSTANT.V3_API_KEY
-#        self.exchange_swap.secret = CONSTANT.V3_SECRET
         
         self.OHLCVs = dict()
         self.instruments = pd.DataFrame(columns=['instrument_id','api_type','futures_type'])
         self.use_server_time = use_server_time
         
-        #markets_info = self.exchange.load_markets()
-        #swap_info = self.exchange_swap.load_markets()
-        
-#        self.future_symbol = list(markets_info.keys())[-27:]
-#        self.swap_symbol = list(swap_info.keys())[-9:]
-#        self.spot_symbol = []
-#        for i in ['BTC','ETH','LTC','EOS','XRP','BCH','BSV','TRX','ETC']:
-#            self.spot_symbol.append(i + '/USDT')
+        if load_markets:
+            self.load_markets()
         
     def _request(self, method, request_path, params, cursor=False):
 
@@ -117,7 +96,7 @@ class Exchange:
 #        if not str(response.status_code).startswith('2'):
 #            raise exceptions.OkexAPIException(response)
         try:
-           # res_header = r.headers
+            #res_header = r.headers
             pass
             if cursor:
                 r = dict()
@@ -131,15 +110,12 @@ class Exchange:
                 return response.json()
         except ValueError:
             raise Exception('Invalid Response: %s' % response.text)
-            
 
     def _request_without_params(self, method, request_path):
         return self._request(method, request_path, {})
 
     def _request_with_params(self, method, request_path, params, cursor=False):
         return self._request(method, request_path, params, cursor)    
-    
-    
     
     def _addParams(self,url,param_name,param):
         new_url = url
@@ -159,9 +135,9 @@ class Exchange:
         base_url = '/api/general/v3/time'
         return json.loads(requests.get(self.okex_url + base_url).content)
     
-    def buildMySign(params):
+    def buildMySign(self, params):
         
-        secretKey=self.secret
+        secretKey= self.secret
         
         sign = ''
         
@@ -174,7 +150,9 @@ class Exchange:
     def load_markets(self,Type='all'):
         
         if(not len(self.instruments) and Type=='all'):
-            self.instruments = pd.DataFrame(columns=['instrument_id','api_type','futures_type'])
+            self.instruments = pd.DataFrame(columns=['instrument_id',
+                                                     'api_type',
+                                                     'futures_type'])
         
         if(Type == 'all'):
             for market_type in ['spot','futures','swap']:    
@@ -182,39 +160,44 @@ class Exchange:
         
         if(Type in ['futures','swap']):
             
-            json_text = pd.DataFrame(json.loads(requests.get(self.okex_url + '/api/%s/v3/instruments' % (Type)).content)).instrument_id
+            json_text = pd.DataFrame(
+                json.loads(
+                    requests.get(
+                        self.okex_url 
+                        + '/api/%s/v3/instruments' 
+                        % (Type)).content)).instrument_id
             json_list = list(json_text)
             count = 0
-            for i in json_list:
-                init_contract_states = ['TW','NW','TQ']
-                self.instruments.loc[ len (self.instruments) ] = (i,Type,i[:-6] + init_contract_states[count%3] if Type=='futures' else None)
+            for i in json_list: 
+                init_contract_states = ['TW','NW','TQ','NQ']
+                waiting_add_item = (i,Type,i[:-6] + init_contract_states[count % 4] if Type=='futures' else None)
+                if not waiting_add_item in self.instruments:    
+                    self.instruments.loc[len(self.instruments)] = waiting_add_item
+                else:
+                    pass
                 count += 1
             
         if(Type in ['spot']):
-            json_text = pd.DataFrame(json.loads(requests.get(self.okex_url +  '/api/swap/v3/instruments').content)).instrument_id
+            
+            json_text = pd.DataFrame(
+                json.loads(
+                    requests.get(
+                        self.okex_url +  
+                        '/api/swap/v3/instruments').content)).instrument_id
             json_list = list(json_text)
             for i in json_list:
-                corrective_i = i[:-5] + 'T' 
-                self.instruments.loc[ len (self.instruments) ] = (corrective_i,Type,None)
-                
+                corrective_i = i[:-5] 
+                if corrective_i[-1] == 'T':
+                    waiting_add_item = (corrective_i,Type,None)
+                    if not waiting_add_item in self.instruments:
+                        self.instruments.loc[ len (self.instruments) ] = (corrective_i,Type,None)
+                else:
+                    pass
+        
+        self.instruments = self.instruments.drop_duplicates()
         self.instruments.set_index(keys='instrument_id')
         
         return True
-            
-#    def get_OHLCV(self,symbol):
-#    
-#        # markets trade pair information/
-#        #print('loading trade pairs')
-#        url_base = '/api/%s/v3/instruments/%s/candles'
-#        
-#        instruments_index_by_instruments_id = self.instruments
-#        instruments_index_by_instruments_id.index = self.instruments['instrument_id']
-#        
-#        market_type = instruments_index_by_instruments_id.loc[symbol]['api_type']
-#        
-#        result = json.loads(requests.get(self.okex_url + url_base % (market_type,symbol)).content)
-#        
-#        return result
         
     def get_wallet(self):
         '''
@@ -306,7 +289,7 @@ class Exchange:
                     'option':OPTION_INSTRUMENTS
                     }
         else:
-            error_logging('Type error')
+            print('Type error')
             return
         return self._request_with_params(GET, KLINE_APIS[Type]+'/'+str(instrument_id)+'/candles', params)
 
@@ -316,12 +299,12 @@ class Exchange:
     def create_future_order(self,instrument_id,otype,price,size, client_oid='',order_type='0', match_price='0'):
         #'client_oid': client_oid,
         params = { 'instrument_id': instrument_id, 
-                  'type': otype, 
-                  'price': price, 
-                  'size': size, 
-                  'client_oid' : client_oid,
-                  'order_type' : order_type,
-                  'match_price': match_price,
+                  'type' : otype,
+                  'price' : price,
+                  'size' : size,
+                  'client_oid'  : client_oid,
+                  'order_type'  : order_type,
+                  'match_price' : match_price,
                   }
         
         return self._request_with_params(POST, FUTURE_ORDER, params)
@@ -411,13 +394,12 @@ class Exchange:
         if(Type in ['spot','futures','swap','option']):
             ACCOUNTS_APIS ={
                     'spot':SPOT_DEPTH + str(instrument_id) + '/book',
-                   # 'lever':LEVER_ACCOUNT,
                     'futures':FUTURE_DEPTH + str(instrument_id) + '/book',
                     'swap':SWAP_INSTRUMENTS+'/'+str(instrument_id)+'/depth',
                     'option':OPTION_INSTRUMENT + '/' + str(instrument_id) +'/book'
                     }
         else:
-            error_logging('Type error')
+            print('Type error')
             return
         return self._request_with_params(GET, ACCOUNTS_APIS[Type] ,params)
 #    
@@ -443,7 +425,7 @@ class Exchange:
                     'option':OPTION_ACCOUNTS_BTCUSD
                     }
         else:
-            error_logging('Type error')
+            print('Type error')
             return
         
         return self._request_without_params(GET, ACCOUNTS_APIS[Type])
@@ -458,7 +440,7 @@ class Exchange:
                     'option':OPTION_POSITION_BTCUSD
                     }
         else:
-            error_logging('Type error')
+            print('Type error')
             return
         
         return self._request_without_params(GET, POSITION_APIS[Type])
@@ -473,7 +455,7 @@ class Exchange:
                 'option':OPTION_POSITION_BTCUSD
                 }
         else:
-            error_logging('Type error')
+            print('Type error')
         
         if instrument_id and Type != 'option':
             print(POSITION_APIS[Type] + instrument_id)
@@ -505,7 +487,7 @@ class Exchange:
                     'option':OPTION_ORDERS + '/'
                     }
         else:
-            error_logging('Type error')
+            print('Type error')
             return
         
         print(ORDER_APIS[Type] + url_suffix)
@@ -525,7 +507,7 @@ class Exchange:
         
             
         else:
-            error_logging('The attributes order_id and client_oid cannot all be empty')
+            print('The attributes order_id and client_oid cannot all be empty')
             
         if(Type in ['spot','lever','futures','swap','option']):
             ORDER_CANCEL_APIS ={
@@ -536,7 +518,7 @@ class Exchange:
                     'option':OPTION_CANCEL_ORDER
                     }
         else:
-            error_logging('Type error')
+            print('Type error')
             return
         print(ORDER_CANCEL_APIS[Type] + url_suffix)
         
@@ -572,7 +554,7 @@ class Exchange:
                     'swap':SWAP_FILLS,
                     }
         else:
-            error_logging('Type error')
+            print('Type error')
             return 
         
         return self._request_with_params(GET, FILLS_APIS[Type], params)
@@ -631,29 +613,7 @@ class Exchange:
     def get_coin_account(self, symbol):
         return self._request_without_params(GET, FUTURE_COIN_ACCOUNT + str(symbol))
 
-    
-    
-#    def get_swap_futures_spread(self,symbol='BSV',contract_type='191227'):
-#        
-#        # init params for depth()
-#        swap_params = [symbol + '-USD-SWAP','swap',10]
-#        futures_params = [symbol + '-USD-' + contract_type,'futures',10]
-#        
-#        # receive depth() returns 
-#        swap_depth = self.get_depth(*swap_params)
-#        futures_depth = self.get_depth(*futures_params)
-#        
-#        # print returns for depth()
-#        print(swap_depth['asks'][0])
-#        print(futures_depth['bids'][0])
-#        long_price = - swap_depth['asks'][0][0] + futures_depth['bids'][0][0]
-#        print('long SWAP: price', long_price)
-#        print()        
-#        short_price = - swap_depth['bids'][0][0] + futures_depth['asks'][0][0]
-#        print(swap_depth['bids'][0])
-#        print(futures_depth['asks'][0])
-#        print('short SWAP: price', short_price)
-        
+
     def get_usdt_rate(self):
         return self._request_without_params(GET, SWAP_RATE)
         
@@ -666,14 +626,6 @@ class Exchange:
         if limit:
             params['limit'] = limit
         return self._request_with_params(GET, SWAP_INSTRUMENTS + '/' + str(instrument_id) + '/historical_funding_rate', params)
-
-#    def get_account(self,symbol,Type):
-#        if(Type in ['swap','spot','futures']):
-#            url = 'http://www.okex.me/api/' + Type + '/v3/accounts/'
-#        else:
-#            raise Exception('the type wrong')
-#        result = requests.get(url + symbol)
-#        return result.content
         
     def _get_timestamp(self):
         url = c.API_URL + c.SERVER_TIMESTAMP_URL
@@ -714,85 +666,6 @@ if __name__ == '__main__':
     
     # this is a create_spot_order example
     #a.create_spot_order('XRP-USDT','1','buy',price='0.23',order_type='0')
-    
-#%%
-class Exchange_asyio(Exchange):
-    
-    def _request(self, method, request_path, params, cursor=False):
-
-        if method == c.GET:
-            request_path = request_path + utils.parse_params_to_str(params)
-        # url
-        url = c.API_URL + request_path
-
-        timestamp = utils.get_timestamp()
-        # sign & header
-        if self.use_server_time:
-            timestamp = self._get_timestamp()
-        body = json.dumps(params) if method == c.POST else ""
-
-        sign = utils.sign(utils.pre_hash(timestamp, method, request_path, str(body)), self.API_SECRET_KEY)
-        header = utils.get_header(self.API_KEY, sign, timestamp, self.PASSPHRASE)
-
-        # send request
-        response = None
-        #print("url:", url)
-        #print("headers:", header)
-        #print("body:", body)
-        
-        # if method == c.GET:
-        #     async with aiohttp.ClientSession() as session:
-        #     response = requests.get(url, headers=header)
-        # elif method == c.POST:
-        #     response = requests.post(url, data=body, headers=header)
-        #     #response = requests.post(url, json=body, headers=header)
-        # elif method == c.DELETE:
-        #     response = requests.delete(url, headers=header)
-        #print(header)
-        header['OK-ACCESS-SIGN'] = header['OK-ACCESS-SIGN'].decode()
-        
-
-        if method == c.GET:
-            # async with aiohttp.ClientSession() as session:
-            #     async with session.get(url, headers = header, timeout=2) as r:
-            #         print(r.status)
-            #         response_json = await r.json()
-            #         print(response_json)
-            #         response = r.json(encoding = 'utf-8')
-            return {'method':'GET','headers':header,'url':url}
-                    
-            #        return response
-                    
-        elif method == c.POST:
-            # async with aiohttp.ClientSession() as session:
-            #     async with session.post(url, headers = header, data=body, timeout=2) as r:
-            #         response = r.text(encoding = 'utf-8')
-            return {'method':'POST','headers':header,'url':url,'data':body}
-                    
-        elif method == c.DELETE:
-            # async with aiohttp.ClientSession() as session:
-            #     async with session.delete(url, headers=header, timeout=2) as r:
-            #         response = r.text(encoding = 'utf-8')
-            return {'method':'DELETE','headers':header,'url':url}
-                    
-        # exception handleA
-#        if not str(response.status_code).startswith('2'):
-#            raise exceptions.OkexAPIException(response)
-        try:
-           # res_header = r.headers
-            pass
-            if cursor:
-                r = dict()
-                try:
-                    r['before'] = res_header['OK-BEFORE']
-                    r['after'] = res_header['OK-AFTER']
-                except:
-                    print("")
-                return response.json() , r
-            else:
-                return response.json()
-        except ValueError:
-            raise Exception('Invalid Response: %s' % response.text)
 
 
 
